@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Data (no subir a GitHub)
+data/raw/
+data/processed/
+*.csv
+*.parquet
+
+# Local DB / artifacts
+*.db
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE / Editors
+.vscode/
+.idea/
