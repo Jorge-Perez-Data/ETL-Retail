@@ -1,64 +1,60 @@
 CREATE SCHEMA IF NOT EXISTS stg;
 
--- Customers
 DROP TABLE IF EXISTS stg.customers;
 CREATE TABLE stg.customers AS
 SELECT
-  customer_id::int,
-  segment::text,
+  id_cliente::int,
+  segmento::text,
   region::text,
-  activity_level::text
+  nivel_actividad::text
 FROM raw.customers;
 
--- Stores
 DROP TABLE IF EXISTS stg.stores;
 CREATE TABLE stg.stores AS
 SELECT
-  store_id::int,
-  store_region::text,
-  store_type::text
+  id_tienda::int,
+  region_tienda::text,
+  tipo_tienda::text
 FROM raw.stores;
 
--- Products
 DROP TABLE IF EXISTS stg.products;
 CREATE TABLE stg.products AS
 SELECT
-  product_id::int,
-  product_name::text,
-  category::text,
-  sub_category::text,
-  brand::text,
-  is_top_seller::boolean
+  id_producto::int,
+  nombre_producto::text,
+  categoria::text,
+  subcategoria::text,
+  marca::text,
+  es_top_ventas::boolean
 FROM raw.products;
 
--- Sales (dedupe + types + basic rules)
 DROP TABLE IF EXISTS stg.sales;
 CREATE TABLE stg.sales AS
 WITH dedup AS (
   SELECT
     *,
-    ROW_NUMBER() OVER (PARTITION BY order_id, line_id ORDER BY order_date) AS rn
+    ROW_NUMBER() OVER (PARTITION BY id_orden, id_linea ORDER BY fecha_orden) AS rn
   FROM raw.sales
 )
 SELECT
-  order_id::bigint,
-  line_id::int,
-  order_date::date,
-  customer_id::int,
-  store_id::int,
-  product_id::int,
-  channel::text,
-  quantity::int,
-  unit_price::numeric(12,2),
-  discount_pct::numeric(6,3),
-  net_sales::numeric(14,2),
-  payment_method::text,
-  COALESCE(shipping_type, 'Unknown')::text AS shipping_type,
-  delivery_days::int,
-  is_returned::int,
-  return_amount::numeric(14,2)
+  id_orden::bigint,
+  id_linea::int,
+  fecha_orden::date,
+  id_cliente::int,
+  id_tienda::int,
+  id_producto::int,
+  canal::text,
+  cantidad::int,
+  precio_unitario::numeric(12,2),
+  descuento_pct::numeric(6,3),
+  venta_neta::numeric(14,2),
+  metodo_pago::text,
+  COALESCE(tipo_envio, 'Unknown')::text AS tipo_envio,
+  dias_entrega::int,
+  es_devuelto::int,
+  monto_devolucion::numeric(14,2)
 FROM dedup
 WHERE rn = 1
-  AND quantity > 0
-  AND unit_price >= 0
-  AND discount_pct BETWEEN 0 AND 1;
+  AND cantidad > 0
+  AND precio_unitario >= 0
+  AND descuento_pct BETWEEN 0 AND 1;

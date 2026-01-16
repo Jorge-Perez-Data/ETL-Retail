@@ -1,239 +1,387 @@
 from __future__ import annotations
 
-import os, random
+import random
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta
 from pathlib import Path
+from datetime import date, timedelta
 
 import numpy as np
 import pandas as pd
-from faker import Faker
 
-# -------------------- Config --------------------
-@dataclass(frozen=True)
-class Cfg:
-    seed: int = 42
-    n_customers: int = 8000
-    n_products: int = 1200
-    n_stores: int = 60
-    n_orders: int = 120000
-    max_lines: int = 5
-    start: date = date(2024, 1, 1)
-    end: date = date(2025, 12, 31)
-    out_dir: str = "data/raw"
-    null_ship_rate: float = 0.002
-    dup_frac: float = 0.001
+# =========================
+# Config
+# =========================
+SEED = 42
+FECHA_INICIO = date(2024, 1, 1)
+FECHA_FIN = date(2025, 12, 31)
 
-CFG = Cfg()
-fake = Faker()
-RNG = np.random.default_rng(CFG.seed)
-random.seed(CFG.seed)
-Faker.seed(CFG.seed)
+N_CLIENTES = 8000
+N_TIENDAS = 60
+N_PRODUCTOS = 1200
+OBJETIVO_LINEAS = 256_000
 
-PAYMENT = {
-    "Online": (["Credit Card", "Debit Card", "Digital Wallet", "Bank Transfer"], [0.45, 0.25, 0.22, 0.08]),
-    "Store":  (["Credit Card", "Debit Card", "Cash"], [0.45, 0.35, 0.20]),
+DIR_SALIDA = Path(__file__).resolve().parent.parent / "data" / "raw"
+DIR_SALIDA.mkdir(parents=True, exist_ok=True)
+
+np.random.seed(SEED)
+random.seed(SEED)
+
+# =========================
+# Dominio: E-commerce deportivo
+# =========================
+REGIONES = ["Norte", "Centro", "Sur"]
+SEGMENTOS = ["Consumidor", "Corporativo", "Hogar"]
+NIVELES_ACTIVIDAD = ["Low", "Medium", "High"]
+
+TIPOS_TIENDA = ["Mall", "Street", "Outlet", "Dark Store"]
+
+CANALES = ["Online", "Tienda"]
+METODOS_PAGO = ["Tarjeta de Credito", "Tarjeta de Debito", "Transferencia", "Efectivo", "WebPay"]
+TIPOS_ENVIO = ["Same Day", "Next Day", "Standard", "Pickup"]
+
+CATEGORIAS = {
+    "Running": ["Zapatillas Running", "Poleras", "Shorts", "Calcetines", "Relojes GPS", "Accesorios"],
+    "Tenis": ["Raquetas Tenis", "Cuerdas", "Overgrips", "Zapatillas Tenis", "Pelotas Tenis", "Mochilas"],
+    "Padel": ["Palas Padel", "Overgrips", "Pelotas Padel", "Zapatillas Padel", "Protectores", "Bolsos"],
+    "Fitness": ["Mancuernas", "Bandas Elasticas", "Colchonetas", "Guantes", "Botellas", "Accesorios"],
 }
-SHIP = {
-    "Online": (["Standard", "Express", "Pickup"], [0.70, 0.18, 0.12]),
-    "Store":  (["In-Store"], [1.0]),
+
+MARCAS = {
+    "Running": ["Nike", "Adidas", "ASICS", "New Balance", "Saucony", "Under Armour"],
+    "Tenis": ["Wilson", "Babolat", "Head", "Yonex", "Prince"],
+    "Padel": ["Bullpadel", "Nox", "Adidas", "Babolat", "Head", "StarVie"],
+    "Fitness": ["Nike", "Adidas", "Reebok", "Under Armour", "Everlast", "Domyos"],
 }
 
-CATS = {
-    "Electronics":   dict(sub=["Audio","Chargers & Cables","Mobile Accessories","Smart Home"], online=1.7,  mu=3.9, sig=0.6,  qty=(1,2), ret=0.055),
-    "Personal Care": dict(sub=["Skincare","Hair","Hygiene"],                      online=1.35, mu=3.2, sig=0.45, qty=(1,4), ret=0.03),
-    "Grocery":       dict(sub=["Snacks","Beverages","Pantry"],                    online=0.95, mu=2.6, sig=0.35, qty=(1,6), ret=0.015),
-    "Home":          dict(sub=["Cleaning","Kitchen","Decor"],                     online=1.15, mu=3.3, sig=0.5,  qty=(1,5), ret=0.025),
+PRECIO_BASE = {
+    "Zapatillas Running": (65000, 160000),
+    "Zapatillas Tenis": (70000, 180000),
+    "Zapatillas Padel": (70000, 180000),
+    "Raquetas Tenis": (90000, 280000),
+    "Palas Padel": (90000, 320000),
+    "Relojes GPS": (120000, 450000),
+    "Pelotas Tenis": (7000, 18000),
+    "Pelotas Padel": (7000, 18000),
+    "Cuerdas": (9000, 25000),
+    "Overgrips": (4000, 12000),
+    "Mochilas": (25000, 90000),
+    "Bolsos": (25000, 110000),
+    "Poleras": (12000, 45000),
+    "Shorts": (12000, 45000),
+    "Calcetines": (4000, 15000),
+    "Protectores": (6000, 25000),
+    "Accesorios": (4000, 25000),
+    "Mancuernas": (15000, 120000),
+    "Bandas Elasticas": (4000, 18000),
+    "Colchonetas": (9000, 35000),
+    "Guantes": (8000, 28000),
+    "Botellas": (4000, 18000),
 }
 
-TOP = [
-    ("USB-C Cable 1m","Electronics","Chargers & Cables"),
-    ("Fast Charger 20W","Electronics","Chargers & Cables"),
-    ("Wireless Earbuds","Electronics","Audio"),
-    ("Phone Case","Electronics","Mobile Accessories"),
-    ("Screen Protector","Electronics","Mobile Accessories"),
-    ("Liquid Detergent 3L","Home","Cleaning"),
-    ("Diapers Pack","Personal Care","Hygiene"),
-    ("Shampoo 750ml","Personal Care","Hair"),
-    ("Chocolate Bar","Grocery","Snacks"),
-    ("Sparkling Water 6-pack","Grocery","Beverages"),
+# Tasa de devolucion por subcategoria: (online, tienda)
+TASA_DEVOLUCION = {
+    "Zapatillas Running": (0.10, 0.05),
+    "Zapatillas Tenis": (0.11, 0.06),
+    "Zapatillas Padel": (0.11, 0.06),
+    "Poleras": (0.08, 0.03),
+    "Shorts": (0.08, 0.03),
+    "Raquetas Tenis": (0.03, 0.02),
+    "Palas Padel": (0.04, 0.02),
+    "Relojes GPS": (0.03, 0.02),
+}
+
+# Eventos (picos + rango de descuento)
+EVENTOS = [
+    ("Cyber", date(2024, 6, 3), date(2024, 6, 5), 1.8, (0.15, 0.45)),
+    ("Fiestas Patrias", date(2024, 9, 10), date(2024, 9, 22), 1.2, (0.05, 0.20)),
+    ("Navidad", date(2024, 12, 1), date(2024, 12, 24), 1.5, (0.05, 0.25)),
+    ("Cyber", date(2025, 6, 2), date(2025, 6, 4), 1.9, (0.15, 0.50)),
+    ("Fiestas Patrias", date(2025, 9, 10), date(2025, 9, 22), 1.2, (0.05, 0.20)),
+    ("Navidad", date(2025, 12, 1), date(2025, 12, 24), 1.6, (0.05, 0.30)),
 ]
 
-# -------------------- Helpers --------------------
-def ensure_out() -> Path:
-    out = Path(CFG.out_dir)
-    out.mkdir(parents=True, exist_ok=True)
-    return out
+# =========================
+# Helpers
+# =========================
+def rango_fechas(d0: date, d1: date):
+    cur = d0
+    while cur <= d1:
+        yield cur
+        cur += timedelta(days=1)
 
-def iso(d: date) -> str:
-    return d.isoformat()
+def clamp(x, lo, hi):
+    return max(lo, min(hi, x))
 
-def rand_date() -> date:
-    days = (CFG.end - CFG.start).days
-    return CFG.start + timedelta(days=int(RNG.integers(0, days + 1)))
+def elegir(items, weights, size=1):
+    w = np.array(weights, dtype=float)
+    w = w / w.sum()
+    idx = np.random.choice(len(items), size=size, replace=True, p=w)
+    return [items[i] for i in idx]
 
-def seasonal_keep_prob(d: date, channel: str) -> float:
+def pesos_pareto(n, alpha=1.18):
+    r = np.arange(1, n + 1)
+    w = 1 / (r ** alpha)
+    return w / w.sum()
+
+def multiplicador_estacional(d: date):
     m = 1.0
-    if d.month in (11, 12): m *= 1.35
-    if d.month in (1, 2):   m *= 0.90
-    keep = min(1.0, m / 1.35)
-    wd = datetime(d.year, d.month, d.day).weekday()
-    if channel == "Online" and wd >= 5: keep *= 1.10
-    return keep
+    if d.month in [1, 2]:
+        m *= 1.10
+    if d.month in [3]:
+        m *= 1.08
+    if d.month in [11]:
+        m *= 1.10
+    if d.weekday() >= 5:
+        m *= 1.06
+    return m
 
-def channel_for(d: date) -> str:
-    wd = datetime(d.year, d.month, d.day).weekday()
-    p_online = 0.62 if wd >= 5 else 0.48
-    return "Online" if RNG.random() < p_online else "Store"
+def mult_evento_y_descuento(d: date):
+    mult = 1.0
+    disc_lo, disc_hi = (0.0, 0.15)
+    for _, s, e, m, disc_rng in EVENTOS:
+        if s <= d <= e:
+            mult *= m
+            disc_lo, disc_hi = disc_rng
+    return mult, disc_lo, disc_hi
 
-def choice_weighted(values, p):
-    return values[int(RNG.choice(len(values), p=p))]
+def mezcla_canal(d: date):
+    online = 0.62
+    if d.weekday() >= 5:
+        online += 0.08
+    for _, s, e, _, _ in EVENTOS:
+        if s <= d <= e:
+            online += 0.10
+            break
+    online = clamp(online, 0.45, 0.85)
+    return [online, 1 - online]  # Online, Tienda
 
-def lognormal_price(cat: str) -> float:
-    meta = CATS[cat]
-    return round(min(float(RNG.lognormal(meta["mu"], meta["sig"])), 1500.0), 2)
+def envio_y_entrega(region: str, canal: str):
+    if canal != "Online":
+        return None, 0
 
-def discount(channel: str, d: date) -> float:
-    base = (0.12 if channel == "Online" else 0.08) + (0.05 if d.month in (11, 12) else 0.0)
-    r = RNG.random()
-    if r < 0.55: return 0.0
-    if r < 0.90: return round(float(RNG.uniform(0.03, base)), 3)
-    return round(float(RNG.uniform(base, min(0.35, base + 0.18))), 3)
+    if region == "Centro":
+        tipos = ["Same Day", "Next Day", "Standard", "Pickup"]
+        w = [0.18, 0.40, 0.32, 0.10]
+        base = {"Same Day": 0, "Next Day": 1, "Standard": 2, "Pickup": 1}
+    elif region == "Norte":
+        tipos = ["Next Day", "Standard", "Pickup"]
+        w = [0.15, 0.70, 0.15]
+        base = {"Next Day": 2, "Standard": 4, "Pickup": 2}
+    else:  # Sur
+        tipos = ["Next Day", "Standard", "Pickup"]
+        w = [0.18, 0.67, 0.15]
+        base = {"Next Day": 2, "Standard": 4, "Pickup": 2}
 
-def delivery_days(channel: str, ship_type: str) -> int:
-    if channel == "Store": return 0
-    if ship_type == "Pickup":  return int(RNG.integers(0, 2))
-    if ship_type == "Express": return int(RNG.integers(1, 3))
-    return int(RNG.integers(2, 8))
+    tipo = elegir(tipos, w, 1)[0]
+    dias = int(clamp(np.random.normal(base[tipo], 1.0), 0, 12))
+    return tipo, dias
 
-def ret_prob(channel: str, cat: str) -> float:
-    p = CATS[cat]["ret"] * (1.35 if channel == "Online" else 1.0)
-    return float(min(p, 0.12))
+def elegir_metodo_pago(monto_orden: float, canal: str) -> str:
+    """
+    Queremos montos bien distintos por metodo:
+    - Transferencia/Credito: tickets altos
+    - Debito/WebPay: medio
+    - Efectivo: bajo (casi solo en tienda)
+    """
+    if canal == "Online":
+        if monto_orden >= 220000:
+            return elegir(["Transferencia", "Tarjeta de Credito", "WebPay"], [0.45, 0.45, 0.10], 1)[0]
+        if monto_orden >= 90000:
+            return elegir(["Tarjeta de Credito", "WebPay", "Tarjeta de Debito"], [0.55, 0.35, 0.10], 1)[0]
+        return elegir(["WebPay", "Tarjeta de Debito", "Tarjeta de Credito"], [0.55, 0.35, 0.10], 1)[0]
+    else:  # Tienda
+        if monto_orden >= 220000:
+            return elegir(["Tarjeta de Credito", "Transferencia", "Tarjeta de Debito"], [0.55, 0.25, 0.20], 1)[0]
+        if monto_orden >= 90000:
+            return elegir(["Tarjeta de Debito", "Tarjeta de Credito", "Efectivo"], [0.55, 0.30, 0.15], 1)[0]
+        return elegir(["Efectivo", "Tarjeta de Debito", "WebPay"], [0.55, 0.35, 0.10], 1)[0]
 
-def lines_per_order(activity: str, channel: str) -> int:
-    base = {"Low": 1.4, "Medium": 2.0, "High": 2.6}[activity] + (0.2 if channel == "Online" else 0.0)
-    return int(np.clip(RNG.poisson(lam=base) + 1, 1, CFG.max_lines))
+@dataclass
+class Producto:
+    id_producto: int
+    nombre_producto: str
+    categoria: str
+    subcategoria: str
+    marca: str
+    es_top_ventas: bool
+    precio_min: int
+    precio_max: int
 
-# -------------------- Build dims --------------------
-def build_customers() -> pd.DataFrame:
-    seg = ["Consumer", "Corporate", "Small Business"]
-    reg = ["North", "Central", "South"]
+def construir_productos(n: int) -> pd.DataFrame:
+    subcats = [(cat, sub) for cat, subs in CATEGORIAS.items() for sub in subs]
+    prefs = []
+    for _, sub in subcats:
+        if "Zapatillas" in sub:
+            prefs.append(5)
+        elif sub in ["Poleras", "Shorts", "Calcetines", "Accesorios", "Overgrips", "Pelotas Tenis", "Pelotas Padel"]:
+            prefs.append(3)
+        else:
+            prefs.append(2)
+    probs = np.array(prefs, float); probs /= probs.sum()
+    picks = np.random.choice(len(subcats), size=n, replace=True, p=probs)
+
+    productos: list[Producto] = []
+    for i in range(n):
+        cat, sub = subcats[picks[i]]
+        marca = random.choice(MARCAS.get(cat, ["Generic"]))
+        lo, hi = PRECIO_BASE.get(sub, (8000, 60000))
+        top = ("Zapatillas" in sub) or (sub in ["Overgrips", "Pelotas Tenis", "Pelotas Padel", "Poleras", "Accesorios"])
+        if random.random() < 0.08:
+            top = True
+        nombre = f"{marca} {sub} {random.choice(['Pro', 'Elite', 'Core', 'Sport', 'Max', 'Lite'])} {random.randint(1, 999)}"
+        productos.append(Producto(i + 1, nombre, cat, sub, marca, top, lo, hi))
+
+    return pd.DataFrame([p.__dict__ for p in productos])
+
+def construir_clientes(n: int) -> pd.DataFrame:
+    w_reg = [0.20, 0.55, 0.25]
+    w_seg = [0.70, 0.18, 0.12]
+    w_act = [0.30, 0.50, 0.20]
     return pd.DataFrame({
-        "customer_id": range(1, CFG.n_customers + 1),
-        "segment": RNG.choice(seg, size=CFG.n_customers, p=[0.68, 0.20, 0.12]),
-        "region": RNG.choice(reg, size=CFG.n_customers, p=[0.30, 0.45, 0.25]),
-        "activity_level": RNG.choice(["Low", "Medium", "High"], size=CFG.n_customers, p=[0.62, 0.28, 0.10]),
+        "id_cliente": np.arange(1, n + 1),
+        "segmento": elegir(SEGMENTOS, w_seg, n),
+        "region": elegir(REGIONES, w_reg, n),
+        "nivel_actividad": elegir(NIVELES_ACTIVIDAD, w_act, n),
     })
 
-def build_stores() -> pd.DataFrame:
-    reg = ["North", "Central", "South"]
-    typ = ["Mall", "Street", "Outlet", "Dark Store"]
+def construir_tiendas(n: int) -> pd.DataFrame:
+    w_reg = [0.18, 0.58, 0.24]
+    w_typ = [0.35, 0.35, 0.20, 0.10]
     return pd.DataFrame({
-        "store_id": range(1, CFG.n_stores + 1),
-        "store_region": RNG.choice(reg, size=CFG.n_stores, p=[0.30, 0.45, 0.25]),
-        "store_type": RNG.choice(typ, size=CFG.n_stores, p=[0.42, 0.30, 0.18, 0.10]),
+        "id_tienda": np.arange(1, n + 1),
+        "region_tienda": elegir(REGIONES, w_reg, n),
+        "tipo_tienda": elegir(TIPOS_TIENDA, w_typ, n),
     })
 
-def build_products() -> pd.DataFrame:
-    rows, pid = [], 1
-    for name, cat, sub in TOP:
-        rows.append(dict(product_id=pid, product_name=name, category=cat, sub_category=sub, brand="Generic", is_top_seller=True))
-        pid += 1
-    while pid <= CFG.n_products:
-        cat = random.choice(list(CATS.keys()))
-        sub = random.choice(CATS[cat]["sub"])
-        rows.append(dict(product_id=pid, product_name=f"{sub} Item {pid}", category=cat, sub_category=sub, brand=f"Brand_{random.randint(1,120)}", is_top_seller=False))
-        pid += 1
-    df = pd.DataFrame(rows)
+def simular_ventas(clientes: pd.DataFrame, tiendas: pd.DataFrame, productos: pd.DataFrame) -> pd.DataFrame:
+    # Pesos producto (Pareto) + boost top ventas
+    w_base = pesos_pareto(len(productos), alpha=1.18)
+    boost = np.where(productos["es_top_ventas"].values, 1.6, 1.0)
+    w_prod = w_base * boost
+    w_prod = w_prod / w_prod.sum()
 
-    base = RNG.zipf(a=1.35, size=len(df)).astype(float)
-    base /= base.sum()
-    boost = np.where(df["is_top_seller"].to_numpy(), 18.0, 1.0)
-    w = (base * boost); w /= w.sum()
-    df["purchase_weight"] = w
-    return df
+    # Peso clientes por actividad
+    mapa_act = {"Low": 0.65, "Medium": 1.0, "High": 1.6}
+    w_cli = clientes["nivel_actividad"].map(mapa_act).to_numpy()
+    w_cli = w_cli / w_cli.sum()
 
-def sample_product(products: pd.DataFrame, channel: str) -> int:
-    w = products["purchase_weight"].to_numpy().copy()
-    if channel == "Online":
-        cats = products["category"].to_numpy()
-        for c, meta in CATS.items():
-            w *= np.where(cats == c, meta["online"], 1.0)
-        w *= np.where(products["is_top_seller"].to_numpy(), 1.15, 1.0)
-    w /= w.sum()
-    return int(RNG.choice(products["product_id"].to_numpy(), p=w))
+    dias = (FECHA_FIN - FECHA_INICIO).days + 1
+    base_lineas_dia = OBJETIVO_LINEAS / dias
 
-# -------------------- Sales --------------------
-def build_sales(customers: pd.DataFrame, products: pd.DataFrame) -> pd.DataFrame:
-    activity = customers.set_index("customer_id")["activity_level"].to_dict()
-    prod_cat = products.set_index("product_id")["category"].to_dict()
-    rows = []
+    filas = []
+    id_orden = 1
 
-    for order_id in range(1, CFG.n_orders + 1):
-        d = rand_date()
-        channel = channel_for(d)
-        if RNG.random() > seasonal_keep_prob(d, channel):
-            continue
+    for f in rango_fechas(FECHA_INICIO, FECHA_FIN):
+        est = multiplicador_estacional(f)
+        mult_ev, d_lo, d_hi = mult_evento_y_descuento(f)
+        lam = base_lineas_dia * est * mult_ev
+        lineas_dia = int(np.random.poisson(lam))
 
-        customer_id = int(RNG.integers(1, CFG.n_customers + 1))
-        store_id = int(RNG.integers(1, CFG.n_stores + 1))
+        # promedio 2 lineas por orden
+        n_ordenes = max(1, int(lineas_dia / 2.0))
+        w_canal = mezcla_canal(f)
 
-        pm, pp = PAYMENT[channel]
-        payment_method = str(RNG.choice(pm, p=pp))
+        for _ in range(n_ordenes):
+            id_cliente = int(np.random.choice(clientes["id_cliente"].values, p=w_cli))
+            region_cliente = clientes.loc[clientes["id_cliente"] == id_cliente, "region"].values[0]
 
-        st, sp = SHIP[channel]
-        shipping_type = str(RNG.choice(st, p=sp))
-        ddays = delivery_days(channel, shipping_type)
+            # tienda más probable de misma region
+            misma = (tiendas["region_tienda"].values == region_cliente)
+            w_tienda = np.where(misma, 1.6, 1.0)
+            w_tienda = w_tienda / w_tienda.sum()
+            id_tienda = int(np.random.choice(tiendas["id_tienda"].values, p=w_tienda))
 
-        for line_id in range(1, lines_per_order(activity[customer_id], channel) + 1):
-            product_id = sample_product(products, channel)
-            cat = prod_cat[product_id]
-            unit_price = lognormal_price(cat)
+            canal = elegir(CANALES, w_canal, 1)[0]
 
-            qmin, qmax = CATS[cat]["qty"]
-            quantity = int(RNG.integers(qmin, qmax + 1))
+            # lineas por orden
+            n_lineas = int(np.random.choice([1, 2, 3, 4], p=[0.46, 0.32, 0.16, 0.06]))
 
-            disc = discount(channel, d)
-            net = round(unit_price * quantity * (1 - disc), 2)
+            lineas_tmp = []
+            total_orden = 0.0
 
-            is_ret = RNG.random() < ret_prob(channel, cat)
-            ret_amt = net if (is_ret and RNG.random() < 0.85) else (round(net * float(RNG.uniform(0.2, 0.8)), 2) if is_ret else 0.0)
+            for id_linea in range(1, n_lineas + 1):
+                id_producto = int(np.random.choice(productos["id_producto"].values, p=w_prod))
+                prod = productos.loc[productos["id_producto"] == id_producto].iloc[0]
 
-            rows.append(dict(
-                order_id=order_id, line_id=line_id, order_date=iso(d),
-                customer_id=customer_id, store_id=store_id, product_id=product_id,
-                channel=channel, quantity=quantity, unit_price=unit_price,
-                discount_pct=disc, net_sales=net, payment_method=payment_method,
-                shipping_type=shipping_type, delivery_days=ddays,
-                is_returned=int(is_ret), return_amount=ret_amt
-            ))
+                # cantidad
+                if prod.subcategoria in ["Pelotas Tenis", "Pelotas Padel", "Overgrips", "Calcetines", "Bandas Elasticas"]:
+                    cantidad = int(np.random.choice([1, 2, 3, 4, 5], p=[0.20, 0.28, 0.24, 0.18, 0.10]))
+                else:
+                    cantidad = int(np.random.choice([1, 2, 3], p=[0.70, 0.22, 0.08]))
 
-    return pd.DataFrame(rows)
+                base_precio = np.random.uniform(prod.precio_min, prod.precio_max)
+                premium = 1.0 + (0.08 if prod.marca in ["Nike", "Adidas", "ASICS", "Wilson", "Babolat"] else 0.0)
+                precio_unitario = round(base_precio * premium, 2)
 
-def add_small_issues(sales: pd.DataFrame) -> pd.DataFrame:
-    if sales.empty: return sales
-    mask = (sales["channel"] == "Online") & (RNG.random(len(sales)) < CFG.null_ship_rate)
-    sales.loc[mask, "shipping_type"] = None
-    dup = sales.sample(frac=CFG.dup_frac, random_state=CFG.seed)
-    return pd.concat([sales, dup], ignore_index=True)
+                desc = float(np.random.uniform(d_lo, d_hi))
+                if canal == "Online":
+                    desc = clamp(desc + np.random.uniform(0.00, 0.06), 0.0, 0.60)
+                descuento_pct = round(desc, 3)
 
-# -------------------- Run --------------------
+                bruto = precio_unitario * cantidad
+                venta_neta = round(bruto * (1 - descuento_pct), 2)
+
+                tipo_envio, dias_entrega = envio_y_entrega(region_cliente, canal)
+
+                rr_online, rr_tienda = TASA_DEVOLUCION.get(prod.subcategoria, (0.04, 0.02))
+                tasa = rr_online if canal == "Online" else rr_tienda
+                es_devuelto = 1 if random.random() < tasa else 0
+                monto_devolucion = round(venta_neta * (1.0 if es_devuelto else 0.0), 2)
+
+                total_orden += venta_neta
+
+                lineas_tmp.append({
+                    "id_orden": id_orden,
+                    "id_linea": id_linea,
+                    "fecha_orden": f.isoformat(),
+                    "id_cliente": id_cliente,
+                    "id_tienda": id_tienda,
+                    "id_producto": id_producto,
+                    "canal": canal,
+                    "cantidad": cantidad,
+                    "precio_unitario": precio_unitario,
+                    "descuento_pct": descuento_pct,
+                    "venta_neta": venta_neta,
+                    "tipo_envio": tipo_envio,
+                    "dias_entrega": int(dias_entrega),
+                    "es_devuelto": int(es_devuelto),
+                    "monto_devolucion": monto_devolucion,
+                })
+
+            # método de pago a nivel de orden (clave para que los montos sean distintos por método)
+            metodo_pago = elegir_metodo_pago(total_orden, canal)
+            for r in lineas_tmp:
+                r["metodo_pago"] = metodo_pago
+
+            filas.extend(lineas_tmp)
+            id_orden += 1
+
+    df = pd.DataFrame(filas)
+
+    if len(df) > OBJETIVO_LINEAS:
+        df = df.sample(n=OBJETIVO_LINEAS, random_state=SEED).sort_values(["fecha_orden", "id_orden", "id_linea"])
+
+    return df.reset_index(drop=True)
+
 def main():
-    print("Working directory:", os.getcwd())
-    out = ensure_out()
+    print(f"Escribiendo CSV en: {DIR_SALIDA}")
 
-    customers = build_customers()
-    stores = build_stores()
-    products = build_products()
-    sales = add_small_issues(build_sales(customers, products))
+    clientes = construir_clientes(N_CLIENTES)
+    tiendas = construir_tiendas(N_TIENDAS)
+    productos = construir_productos(N_PRODUCTOS)
+    ventas = simular_ventas(clientes, tiendas, productos)
 
-    customers.to_csv(out / "customers.csv", index=False)
-    stores.to_csv(out / "stores.csv", index=False)
-    products.drop(columns=["purchase_weight"]).to_csv(out / "products.csv", index=False)
-    sales.to_csv(out / "sales.csv", index=False)
+    # Mantenemos nombres de archivos igual para no tocar loader
+    clientes.to_csv(DIR_SALIDA / "customers.csv", index=False)
+    tiendas.to_csv(DIR_SALIDA / "stores.csv", index=False)
+    productos.to_csv(DIR_SALIDA / "products.csv", index=False)
+    ventas.to_csv(DIR_SALIDA / "sales.csv", index=False)
 
-    print("Saved CSVs to:", out.resolve())
-    print("Rows:", f"customers={len(customers):,}, stores={len(stores):,}, products={len(products):,}, sales_lines={len(sales):,}")
+    print("OK:")
+    print(" clientes :", len(clientes))
+    print(" tiendas  :", len(tiendas))
+    print(" productos:", len(productos))
+    print(" ventas   :", len(ventas))
 
 if __name__ == "__main__":
     main()

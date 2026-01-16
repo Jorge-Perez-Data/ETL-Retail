@@ -1,51 +1,60 @@
-CREATE SCHEMA IF NOT EXISTS mart;
+CREATE SCHEMA IF NOT EXISTS stg;
 
--- Dim Date
-DROP TABLE IF EXISTS mart.dim_date;
-CREATE TABLE mart.dim_date AS
-SELECT DISTINCT
-  order_date AS date,
-  EXTRACT(YEAR FROM order_date)::int AS year,
-  EXTRACT(MONTH FROM order_date)::int AS month,
-  TO_CHAR(order_date, 'YYYY-MM') AS year_month,
-  EXTRACT(DAY FROM order_date)::int AS day,
-  EXTRACT(DOW FROM order_date)::int AS day_of_week
-FROM stg.sales;
-
--- Dim Customer
-DROP TABLE IF EXISTS mart.dim_customer;
-CREATE TABLE mart.dim_customer AS
-SELECT * FROM stg.customers;
-
--- Dim Store
-DROP TABLE IF EXISTS mart.dim_store;
-CREATE TABLE mart.dim_store AS
-SELECT * FROM stg.stores;
-
--- Dim Product
-DROP TABLE IF EXISTS mart.dim_product;
-CREATE TABLE mart.dim_product AS
-SELECT * FROM stg.products;
-
--- Fact Sales (línea)
-DROP TABLE IF EXISTS mart.fact_sales;
-CREATE TABLE mart.fact_sales AS
+DROP TABLE IF EXISTS stg.customers;
+CREATE TABLE stg.customers AS
 SELECT
-  s.order_id,
-  s.line_id,
-  s.order_date,
-  s.customer_id,
-  s.store_id,
-  s.product_id,
-  s.channel,
-  s.quantity,
-  s.unit_price,
-  s.discount_pct,
-  s.net_sales,
-  s.payment_method,
-  s.shipping_type,
-  s.delivery_days,
-  s.is_returned,
-  s.return_amount,
-  (s.net_sales - s.return_amount)::numeric(14,2) AS net_sales_after_returns
-FROM stg.sales s;
+  id_cliente::int,
+  segmento::text,
+  region::text,
+  nivel_actividad::text
+FROM raw.customers;
+
+DROP TABLE IF EXISTS stg.stores;
+CREATE TABLE stg.stores AS
+SELECT
+  id_tienda::int,
+  region_tienda::text,
+  tipo_tienda::text
+FROM raw.stores;
+
+DROP TABLE IF EXISTS stg.products;
+CREATE TABLE stg.products AS
+SELECT
+  id_producto::int,
+  nombre_producto::text,
+  categoria::text,
+  subcategoria::text,
+  marca::text,
+  es_top_ventas::boolean
+FROM raw.products;
+
+DROP TABLE IF EXISTS stg.sales;
+CREATE TABLE stg.sales AS
+WITH dedup AS (
+  SELECT
+    *,
+    ROW_NUMBER() OVER (PARTITION BY id_orden, id_linea ORDER BY fecha_orden) AS rn
+  FROM raw.sales
+)
+SELECT
+  id_orden::bigint,
+  id_linea::int,
+  fecha_orden::date,
+  id_cliente::int,
+  id_tienda::int,
+  id_producto::int,
+  canal::text,
+  cantidad::int,
+  precio_unitario::numeric(12,2),
+  descuento_pct::numeric(6,3),
+  venta_neta::numeric(14,2),
+  metodo_pago::text,
+  COALESCE(tipo_envio, 'Unknown')::text AS tipo_envio,
+  dias_entrega::int,
+  es_devuelto::int,
+  monto_devolucion::numeric(14,2)
+FROM dedup
+WHERE rn = 1
+  AND cantidad > 0
+  AND precio_unitario >= 0
+  AND descuento_pct BETWEEN 0 AND 1;
