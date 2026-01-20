@@ -12,7 +12,7 @@ import pandas as pd
 # Config
 # =========================
 SEED = 42
-FECHA_INICIO = date(2024, 1, 1)
+FECHA_INICIO = date(2022, 1, 1)
 FECHA_FIN = date(2025, 12, 31)
 
 N_CLIENTES = 8000
@@ -30,8 +30,38 @@ random.seed(SEED)
 # Dominio: E-commerce deportivo
 # =========================
 REGIONES = ["Norte", "Centro", "Sur"]
+# =========================
+# Geografía LATAM (tiendas)
+# =========================
+GEO_CIUDADES = [
+    # country, region_admin, city, lat, lon, region_macro (Norte/Centro/Sur)
+    ("Chile", "Metropolitana", "Santiago", -33.4489, -70.6693, "Centro"),
+    ("Chile", "Valparaíso", "Viña del Mar", -33.0245, -71.5518, "Centro"),
+    ("Chile", "Biobío", "Concepción", -36.8270, -73.0498, "Sur"),
+
+    ("Argentina", "Buenos Aires", "Buenos Aires", -34.6037, -58.3816, "Centro"),
+    ("Argentina", "Córdoba", "Córdoba", -31.4201, -64.1888, "Centro"),
+    ("Argentina", "Santa Fe", "Rosario", -32.9587, -60.6930, "Centro"),
+
+    ("Peru", "Lima", "Lima", -12.0464, -77.0428, "Centro"),
+    ("Peru", "Arequipa", "Arequipa", -16.4090, -71.5375, "Sur"),
+
+    ("Colombia", "Bogotá D.C.", "Bogotá", 4.7110, -74.0721, "Norte"),
+    ("Colombia", "Antioquia", "Medellín", 6.2442, -75.5812, "Norte"),
+    ("Colombia", "Valle del Cauca", "Cali", 3.4516, -76.5320, "Norte"),
+
+    ("Mexico", "CDMX", "Ciudad de México", 19.4326, -99.1332, "Norte"),
+    ("Mexico", "Jalisco", "Guadalajara", 20.6597, -103.3496, "Norte"),
+    ("Mexico", "Nuevo León", "Monterrey", 25.6866, -100.3161, "Norte"),
+
+    ("Brazil", "São Paulo", "São Paulo", -23.5505, -46.6333, "Sur"),
+    ("Brazil", "Rio de Janeiro", "Rio de Janeiro", -22.9068, -43.1729, "Sur"),
+    ("Brazil", "Minas Gerais", "Belo Horizonte", -19.9167, -43.9345, "Sur"),
+]
+
 SEGMENTOS = ["Consumidor", "Corporativo", "Hogar"]
 NIVELES_ACTIVIDAD = ["Low", "Medium", "High"]
+
 
 TIPOS_TIENDA = ["Mall", "Street", "Outlet", "Dark Store"]
 
@@ -245,13 +275,42 @@ def construir_clientes(n: int) -> pd.DataFrame:
     })
 
 def construir_tiendas(n: int) -> pd.DataFrame:
-    w_reg = [0.18, 0.58, 0.24]
     w_typ = [0.35, 0.35, 0.20, 0.10]
-    return pd.DataFrame({
+
+    geo = pd.DataFrame(
+        GEO_CIUDADES,
+        columns=["pais", "region_admin", "ciudad", "latitud", "longitud", "region_tienda"]
+    )
+
+    # Pesos por país (ajusta si quieres más/menos presencia)
+    w_pais = {
+        "Chile": 0.28,
+        "Argentina": 0.18,
+        "Peru": 0.12,
+        "Colombia": 0.14,
+        "Mexico": 0.16,
+        "Brazil": 0.12,
+    }
+
+    geo["w"] = geo["pais"].map(w_pais).fillna(0.10)
+    geo["w"] = geo["w"] / geo["w"].sum()
+
+    picks = np.random.choice(geo.index, size=n, replace=True, p=geo["w"].values)
+    chosen = geo.loc[picks].reset_index(drop=True)
+
+    tiendas = pd.DataFrame({
         "id_tienda": np.arange(1, n + 1),
-        "region_tienda": elegir(REGIONES, w_reg, n),
+        "region_tienda": chosen["region_tienda"],  # Norte/Centro/Sur (macro)
         "tipo_tienda": elegir(TIPOS_TIENDA, w_typ, n),
+        "pais": chosen["pais"],
+        "region_admin": chosen["region_admin"],
+        "ciudad": chosen["ciudad"],
+        "latitud": chosen["latitud"].astype(float),
+        "longitud": chosen["longitud"].astype(float),
     })
+
+    return tiendas
+
 
 def simular_ventas(clientes: pd.DataFrame, tiendas: pd.DataFrame, productos: pd.DataFrame) -> pd.DataFrame:
     # Pesos producto (Pareto) + boost top ventas
