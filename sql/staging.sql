@@ -14,8 +14,15 @@ CREATE TABLE stg.stores AS
 SELECT
   id_tienda::int,
   region_tienda::text,
-  tipo_tienda::text
+  tipo_tienda::text,
+  pais::text,
+  region_admin::text,
+  ciudad::text,
+  latitud::double precision,
+  longitud::double precision
 FROM raw.stores;
+
+
 
 DROP TABLE IF EXISTS stg.products;
 CREATE TABLE stg.products AS
