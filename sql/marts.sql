@@ -1,60 +1,98 @@
-CREATE SCHEMA IF NOT EXISTS stg;
+CREATE SCHEMA IF NOT EXISTS mart;
 
-DROP TABLE IF EXISTS stg.customers;
-CREATE TABLE stg.customers AS
-SELECT
-  id_cliente::int,
-  segmento::text,
-  region::text,
-  nivel_actividad::text
-FROM raw.customers;
+-- =========================
+-- DIM DATE (desde stg.sales)
+-- =========================
+DROP TABLE IF EXISTS mart.dim_date;
 
-DROP TABLE IF EXISTS stg.stores;
-CREATE TABLE stg.stores AS
-SELECT
-  id_tienda::int,
-  region_tienda::text,
-  tipo_tienda::text
-FROM raw.stores;
-
-DROP TABLE IF EXISTS stg.products;
-CREATE TABLE stg.products AS
-SELECT
-  id_producto::int,
-  nombre_producto::text,
-  categoria::text,
-  subcategoria::text,
-  marca::text,
-  es_top_ventas::boolean
-FROM raw.products;
-
-DROP TABLE IF EXISTS stg.sales;
-CREATE TABLE stg.sales AS
-WITH dedup AS (
-  SELECT
-    *,
-    ROW_NUMBER() OVER (PARTITION BY id_orden, id_linea ORDER BY fecha_orden) AS rn
-  FROM raw.sales
+CREATE TABLE mart.dim_date AS
+WITH bounds AS (
+  SELECT MIN(fecha_orden) AS dmin, MAX(fecha_orden) AS dmax
+  FROM stg.sales
+),
+dates AS (
+  SELECT generate_series(
+    (SELECT dmin FROM bounds),
+    (SELECT dmax FROM bounds),
+    interval '1 day'
+  )::date AS date
 )
 SELECT
-  id_orden::bigint,
-  id_linea::int,
-  fecha_orden::date,
-  id_cliente::int,
-  id_tienda::int,
-  id_producto::int,
-  canal::text,
-  cantidad::int,
-  precio_unitario::numeric(12,2),
-  descuento_pct::numeric(6,3),
-  venta_neta::numeric(14,2),
-  metodo_pago::text,
-  COALESCE(tipo_envio, 'Unknown')::text AS tipo_envio,
-  dias_entrega::int,
-  es_devuelto::int,
-  monto_devolucion::numeric(14,2)
-FROM dedup
-WHERE rn = 1
-  AND cantidad > 0
-  AND precio_unitario >= 0
-  AND descuento_pct BETWEEN 0 AND 1;
+  date,
+  EXTRACT(YEAR FROM date)::int AS year,
+  EXTRACT(MONTH FROM date)::int AS month,
+  TO_CHAR(date, 'YYYY-MM') AS year_month,
+  EXTRACT(DAY FROM date)::int AS day,
+  TO_CHAR(date, 'Dy') AS day_of_week
+FROM dates;
+
+-- =========================
+-- DIM CUSTOMER
+-- =========================
+DROP TABLE IF EXISTS mart.dim_customer;
+
+CREATE TABLE mart.dim_customer AS
+SELECT
+  id_cliente      AS customer_id,
+  segmento        AS segment,
+  region          AS region,
+  nivel_actividad AS activity_level
+FROM stg.customers;
+
+-- =========================
+-- DIM STORE
+-- =========================
+DROP TABLE IF EXISTS mart.dim_store;
+
+CREATE TABLE mart.dim_store AS
+SELECT
+  id_tienda       AS store_id,
+  region_tienda   AS store_region,
+  tipo_tienda     AS store_type,
+  pais            AS country,
+  region_admin    AS state_region,
+  ciudad          AS city,
+  latitud         AS latitude,
+  longitud        AS longitude
+FROM stg.stores;
+
+-- =========================
+-- DIM PRODUCT
+-- =========================
+DROP TABLE IF EXISTS mart.dim_product;
+
+CREATE TABLE mart.dim_product AS
+SELECT
+  id_producto     AS product_id,
+  nombre_producto AS product_name,
+  categoria       AS category,
+  subcategoria    AS sub_category,
+  marca           AS brand,
+  es_top_ventas   AS is_top_seller
+FROM stg.products;
+
+-- =========================
+-- FACT SALES
+-- =========================
+DROP TABLE IF EXISTS mart.fact_sales;
+
+CREATE TABLE mart.fact_sales AS
+SELECT
+  s.id_orden                                   AS order_id,
+  s.id_linea                                   AS line_id,
+  s.fecha_orden                                AS order_date,
+  s.id_cliente                                 AS customer_id,
+  s.id_tienda                                  AS store_id,
+  s.id_producto                                AS product_id,
+  s.canal                                      AS channel,
+  s.cantidad                                   AS quantity,
+  s.precio_unitario                            AS unit_price,
+  s.descuento_pct                              AS discount_pct,
+  s.venta_neta                                 AS net_sales,
+  s.metodo_pago                                AS payment_method,
+  s.tipo_envio                                 AS shipping_type,
+  s.dias_entrega                               AS delivery_days,
+  s.es_devuelto                                AS is_returned,
+  s.monto_devolucion                           AS return_amount,
+  (s.venta_neta - s.monto_devolucion)          AS net_sales_after_returns
+FROM stg.sales s;
