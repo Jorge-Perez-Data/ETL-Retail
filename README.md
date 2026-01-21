@@ -81,6 +81,7 @@ Esto permite mantener compatibilidad técnica sin sacrificar claridad para usuar
 ### Ejecutar todo el flujo en un solo paso
 ```powershell
 .\run_pipeline.ps1
+```
 
 ## Definición de KPIs
 
