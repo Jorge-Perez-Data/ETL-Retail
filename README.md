@@ -1,4 +1,4 @@
-# Retail Analytics Data Platform (2024–2025)
+# Retail Analytics Data Platform (2022–2025)
 
 Proyecto de portafolio orientado a **Data Engineering y Business Intelligence**, que simula una plataforma analítica para un negocio retail omnicanal (tienda física y e-commerce).
 
@@ -27,7 +27,7 @@ PostgreSQL (Docker)
 ↓
 raw → stg → mart (SQL)
 ↓
-Power BI (Modelo semántico y dashboards)
+Power BI (Modelo estrella y dashboards)
 
 
 ### Capas de datos
@@ -76,10 +76,15 @@ Power BI (Modelo semántico y dashboards)
 
 Esto permite mantener compatibilidad técnica sin sacrificar claridad para usuarios finales.
 
----
-
 ## Ejecución del pipeline
 
 ### Ejecutar todo el flujo en un solo paso
 ```powershell
 .\run_pipeline.ps1
+
+## Definición de KPIs
+
+### 1 KPI: Cantidad vendida mensualmente por Año.
+### 2 KPI: Comparativo Anual entre Ventas, Cantidad, Ordenes y Promedio Ordenes.
+### 3 KPI: Total de Ventas por Categorías.
+### 4 KPI: Ventas comparativas por País.
