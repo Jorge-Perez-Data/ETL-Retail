@@ -27,7 +27,7 @@ El enfoque es **realista**, alineado a escenarios comunes en equipos de BI / Ana
 El proyecto sigue una arquitectura analítica en capas, separando generación, ingestión,
 transformación y consumo de datos.
 
-![Arquitectura del pipeline analítico](docs/arquitectura.png)
+![Arquitectura del pipeline analítico](docs/Arquitectura.png)
 
 ---
 
