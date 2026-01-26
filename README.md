@@ -70,26 +70,26 @@ Incluye:
 
 ### Generación de datos (Python)
 - Dataset sintético retail para los años **2022–2025**  
-- Estacionalidad (Cyber, Navidad, fines de semana)  
-- Canal online vs tienda física  
-- Diferenciación realista por método de pago  
-- Devoluciones por categoría y canal  
-- Distribuciones no uniformes (long tail y productos estrella)  
+- Estacionalidad (Cyber, Navidad, fines de semana).  
+- Canal online vs tienda física.  
+- Diferenciación realista por método de pago.  
+- Devoluciones por categoría y canal.  
+- Distribuciones no uniformes (long tail y productos estrella).  
 
 ### Base de datos
-- PostgreSQL ejecutándose en Docker  
-- Persistencia de datos y reconstrucción del modelo de forma reproducible  
+- PostgreSQL ejecutándose en Docker.  
+- Persistencia de datos y reconstrucción del modelo de forma reproducible.  
 
 ### Transformaciones SQL
-- Creación de tablas de staging (`stg`)  
-- Construcción del modelo estrella (`mart`)  
-- Separación clara entre capas técnicas y analíticas  
+- Creación de tablas de staging (`stg`).  
+- Construcción del modelo estrella (`mart`).  
+- Separación clara entre capas técnicas y analíticas.  
 
 ### Data Quality Checks
-- Integridad referencial (sin ventas huérfanas)  
-- Validación de descuentos (0–100%)  
-- Validación de cantidades y devoluciones  
-- Controles diseñados para prevenir errores en BI  
+- Integridad referencial (sin ventas huérfanas).  
+- Validación de descuentos (0–100%).  
+- Validación de cantidades y devoluciones.  
+- Controles diseñados para prevenir errores en BI.  
 
 ---
 
@@ -130,7 +130,7 @@ Este enfoque replica decisiones habituales en análisis comercial real, donde se
 
 ---
 
-## Consumo analítico (Power BI)
+## Dashboards Power BI
 
 El proyecto incluye dashboards diseñados bajo un enfoque ejecutivo y analítico:
 
@@ -146,7 +146,7 @@ El proyecto incluye dashboards diseñados bajo un enfoque ejecutivo y analítico
   - Impacto de descuentos y devoluciones.
   - Identificación de concentraciones de ventas y outliers.
 
-  
+
   ![Dashboard Comercial](docs/Analisis_Comercial.png)
 
 Las visualizaciones están orientadas a **interpretación y toma de decisiones**, no solo a exploración descriptiva.
@@ -155,9 +155,9 @@ Las visualizaciones están orientadas a **interpretación y toma de decisiones**
 
 ## Convención de nombres
 
-- **Base de datos / SQL**: columnas en inglés (estándar analítico)  
-- **Capa semántica (Power BI)**: nombres en español, orientados a negocio  
-- **Medidas DAX**: definidas en español  
+- **Base de datos / SQL**: columnas en inglés (estándar analítico).  
+- **Capa semántica (Power BI)**: nombres en español, orientados a negocio.  
+- **Medidas DAX**: definidas en español.
 
 Esto permite mantener compatibilidad técnica sin sacrificar claridad para usuarios finales.
 
