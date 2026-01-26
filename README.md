@@ -91,10 +91,27 @@ Incluye:
 - Validación de cantidades y devoluciones  
 - Controles diseñados para prevenir errores en BI  
 
-### Consumo analítico
-- Modelo conectado a Power BI  
-- Medidas DAX orientadas a negocio  
-- Visualizaciones ejecutivas y analíticas  
+---
+
+## Decisiones analíticas y tratamiento de datos atípicos
+
+Dado que el dataset es **sintético pero intencionalmente realista**, se incluyeron escenarios de
+alta concentración de ventas en ciertos productos (long tail y top sellers).
+
+Durante el análisis se identificaron **valores atípicos extremos**, por ejemplo:
+- Productos con ventas muy superiores al resto del portafolio, que distorsionaban rankings y visualizaciones.
+
+### Enfoque adoptado
+- **Los datos no se eliminan del modelo ni de la base de datos**, ya que reflejan un escenario posible.
+- Para análisis comparativos y visualizaciones de negocio (Top N productos, marcas):
+  - Se **excluyen outliers extremos** cuando afectan la interpretabilidad.
+  - Se prioriza la lectura analítica por sobre la magnitud absoluta.
+- Las métricas principales se basan en:
+  - **Ventas netas post devolución**, como indicador de desempeño real.
+  - Comparativos YoY y análisis de tendencia.
+
+Este enfoque replica decisiones habituales en análisis comercial real, donde se balancea
+**precisión técnica** con **claridad para la toma de decisiones**.
 
 ---
 
@@ -110,6 +127,29 @@ Incluye:
 - Ventas por categoría y marca  
 - Mix de canales (Online vs Tienda)  
 - Ventas comparativas por país  
+
+---
+
+## Consumo analítico (Power BI)
+
+El proyecto incluye dashboards diseñados bajo un enfoque ejecutivo y analítico:
+
+- **Análisis General de Ventas**
+  - Visión global del desempeño comercial.
+  - Tendencias, mix de canales y distribución geográfica.
+
+
+  ![Dashboard General](docs/Analisis_General.png)
+
+- **Análisis Comercial**
+  - Productos y marcas más relevantes post devolución.
+  - Impacto de descuentos y devoluciones.
+  - Identificación de concentraciones de ventas y outliers.
+
+  
+  ![Dashboard Comercial](docs/Analisis_Comercial.png)
+
+Las visualizaciones están orientadas a **interpretación y toma de decisiones**, no solo a exploración descriptiva.
 
 ---
 
