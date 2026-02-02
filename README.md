@@ -104,7 +104,7 @@ Durante el análisis se identificaron **valores atípicos extremos**, por ejempl
 ### Enfoque adoptado
 - **Los datos no se eliminan del modelo ni de la base de datos**, ya que reflejan un escenario posible.
 - Para análisis comparativos y visualizaciones de negocio (Top N productos, marcas):
-  - Se **excluyen outliers extremos** cuando afectan la interpretabilidad.
+  - Se **excluyen outliers extremos** cuando afectan la interpretabilidad, como por ejemplo con la marca Wilson.
   - Se prioriza la lectura analítica por sobre la magnitud absoluta.
 - Las métricas principales se basan en:
   - **Ventas netas post devolución**, como indicador de desempeño real.
@@ -153,7 +153,7 @@ Las visualizaciones están orientadas a **interpretación y toma de decisiones**
 
 ---
 
-## Convención de nombres
+## Conversión de Nombres
 
 - **Base de datos / SQL**: columnas en inglés (estándar analítico).  
 - **Capa semántica (Power BI)**: nombres en español, orientados a negocio.  
